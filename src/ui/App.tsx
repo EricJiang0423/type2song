@@ -103,7 +103,7 @@ const PIANO_ROW: ReadonlyArray<readonly [string, string]> = [
 ];
 
 const STEP_TONE_COLOR: Record<CalculationStep["tone"], string> = {
-  input: "#f2c76e",
+  input: "#c9956b",
   scale: "#9ec6ff",
   harmony: "#f3a2ad",
   rhythm: "#7fd5c6",

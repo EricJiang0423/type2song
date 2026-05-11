@@ -646,6 +646,14 @@ export class AudioEngine {
       return Math.ceil(now / fourBars + 0.001) * fourBars;
     }
 
+    // When drums are on, snap to the nearest grid position so notes lock into
+    // the kick/snare/hat pattern instead of landing loosely between hits.
+    if (this.arrangement.drumsEnabled) {
+      const step = Tone.Time(this.style.quantize).toSeconds();
+      const nearest = Math.round(now / step) * step;
+      return nearest > now + 0.005 ? nearest : nearest + step;
+    }
+
     const transport = Tone.Transport as unknown as {
       nextSubdivision?: (subdivision: string) => number;
     };

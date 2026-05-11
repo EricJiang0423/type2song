@@ -16,6 +16,7 @@ const COPY: Record<Language, {
   headline: string;
   body: string;
   cta: string;
+  gitHub: string;
   status: string;
   howTitle: string;
   how1: string;
@@ -48,6 +49,7 @@ const COPY: Record<Language, {
     headline: "Every keystroke is a note. Your typing is the score.",
     body: "Type2Song is a browser-based musical instrument disguised as a text box. As you type, each keypress becomes a scale-tuned melody note backed by a real-time chord progression. It listens to your rhythm, remembers your phrases, and fills the silence after you pause — like a second musician who only plays when you stop. No music theory. No MIDI keyboard. No install. Just open the page, start audio, and write.",
     cta: "Enter Studio",
+    gitHub: "GitHub",
     status: "Works in any modern browser. Audio starts on your first click.",
     howTitle: "What happens when you press a key",
     how1: "Your keypress is mapped to a scale degree — not a fixed pitch. In C major, the A key plays the 6th degree (la); switch to A minor and that same A becomes the 1st (do). The scale does the heavy lifting so every random sentence already sounds like a phrase.",
@@ -80,6 +82,7 @@ const COPY: Record<Language, {
     headline: "每一个按键都是一个音符。你的打字节奏就是乐谱。",
     body: "Type2Song 是一个藏在输入框里的浏览器乐器。你正常打字，每一个按键都会被实时翻译成有调性的旋律音，背后有一整套和弦进行在走。它会感知你的打字节奏、记住你敲出的短句、在你停顿时续写几个音——像一个只在你沉默时出声的第二个乐手。不需要乐理、不需要 MIDI 键盘、不需要安装任何东西。打开网页，点 Start Audio，开始写。",
     cta: "进入演奏界面",
+    gitHub: "GitHub",
     status: "所有现代浏览器都能运行。音频在你首次点击后启动。",
     howTitle: "按下一个键，发生了什么",
     how1: "你的按键先被映射到当前音阶的级数，而不是固定音高。在 C 大调里按 A 是 6 级音（la）；切到 A 小调，同一个 A 就变成了 1 级音（do）。音阶替你完成了旋律写作中最难的一步——选音。所以随便敲一句话听起来都像一句有意为之的乐句。",
@@ -109,10 +112,30 @@ const COPY: Record<Language, {
 };
 
 const VOICE_COLORS: Record<string, string> = {
-  "lofi-night": "#f2c76e",
+  "lofi-night": "#c9956b",
   "ethereal-keys": "#b7c8ff",
   "cute-game-bgm": "#a8ec7b",
 };
+
+const GITHUB_URL = "https://github.com/EricJiang0423/type2song";
+
+/** Step-like visual anchors between sections — a subtle degree-map fragment. */
+function SectionArtifact({ color }: { color: string }) {
+  return (
+    <div className="pointer-events-none flex items-center gap-2 py-4 select-none" aria-hidden>
+      {["Ⅰ", "ⅱ", "ⅲ", "ⅳ", "Ⅴ", "ⅵ", "ⅶ"].map((rn, i) => (
+        <span
+          key={i}
+          className="text-xs"
+          style={{ color, opacity: 0.12 + i * 0.08 }}
+        >
+          {rn}
+        </span>
+      ))}
+      <span className="ml-1 text-[10px] t-faint">—</span>
+    </div>
+  );
+}
 
 export function LandingPage({ onEnter }: { onEnter: () => void }) {
   const [language, setLanguage] = useState<Language>("zh");
@@ -124,36 +147,66 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
   };
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-[var(--bg)] text-[var(--ink)]" style={appStyle}>
+    <main
+      className="relative min-h-screen overflow-x-hidden bg-[var(--bg)] text-[var(--ink)]"
+      style={{ ...appStyle, fontFamily: "var(--font-serif)" }}
+    >
       <div className="aura pointer-events-none fixed inset-0 opacity-80" aria-hidden />
 
       {/* ── header ─────────────────────────────────────────────── */}
-      <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-5 py-5 sm:px-8">
-        <div className="flex min-w-0 items-baseline gap-3">
+      <header className="relative z-10 mx-auto w-full max-w-6xl px-5 py-4 sm:flex sm:items-center sm:justify-between sm:py-5 sm:px-8">
+        <div className="flex items-baseline justify-between sm:justify-start sm:gap-4">
           <span className="serif text-2xl font-semibold tracking-tight sm:text-3xl">
             <span className="text-[var(--accent)]">✦</span>&nbsp;Type2Song
           </span>
-          <span className="hidden truncate text-sm t-dim sm:inline">{t.nav}</span>
+          <span className="text-xs t-dim sm:hidden">{t.nav}</span>
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn -mr-1 px-2.5 py-1 text-xs sm:hidden"
+          >
+            {t.gitHub}
+          </a>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="seg flex" role="group" aria-label="Language">
-            <button data-on={language === "zh"} onClick={() => setLanguage("zh")} type="button">中文</button>
-            <button data-on={language === "en"} onClick={() => setLanguage("en")} type="button">EN</button>
+        <div className="mt-3 flex items-center justify-between gap-2 sm:mt-0">
+          <span className="hidden truncate text-sm t-dim sm:inline">{t.nav}</span>
+          <div className="flex items-center gap-2">
+            <div className="seg flex" role="group" aria-label="Language">
+              <button data-on={language === "zh"} onClick={() => setLanguage("zh")} type="button">中文</button>
+              <button data-on={language === "en"} onClick={() => setLanguage("en")} type="button">EN</button>
+            </div>
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn hidden px-3 py-1.5 text-xs sm:inline-flex"
+            >
+              {t.gitHub}
+            </a>
+            <button className="btn btn-accent px-4 py-2 text-sm" onClick={onEnter} type="button">{t.cta}</button>
           </div>
-          <button className="btn btn-accent px-4 py-2 text-sm" onClick={onEnter} type="button">{t.cta}</button>
         </div>
       </header>
 
       {/* ── hero ───────────────────────────────────────────────── */}
-      <section className="relative mx-auto w-full max-w-6xl px-5 pb-24 pt-16 sm:px-8 sm:pt-28">
-        <p className="label-cap text-[var(--accent)] tracking-[0.2em]">{t.eyebrow}</p>
-        <h1 className="serif mt-6 max-w-4xl text-5xl font-semibold leading-[1.04] tracking-tight sm:text-7xl sm:leading-[1.02]">
+      <section className="relative mx-auto w-full max-w-6xl px-5 pb-28 pt-12 sm:px-8 sm:pt-32">
+        {/* subtle watermark note */}
+        <span
+          className="note-watermark pointer-events-none absolute right-8 top-0 z-0 select-none text-[10rem] sm:text-[16rem]"
+          aria-hidden
+        >
+          ✦
+        </span>
+
+        <p className="label-cap relative z-10 text-[var(--accent)] tracking-[0.2em]">{t.eyebrow}</p>
+        <h1 className="serif relative z-10 mt-5 max-w-4xl text-5xl font-semibold leading-[1.04] tracking-tight sm:text-7xl sm:leading-[1.02]">
           {t.headline}
         </h1>
-        <p className="mt-8 max-w-3xl text-lg leading-8 t-dim sm:text-xl sm:leading-9">
+        <p className="relative z-10 mt-8 max-w-3xl text-lg leading-8 t-dim sm:text-xl sm:leading-9">
           {t.body}
         </p>
-        <div className="mt-10 flex flex-wrap items-center gap-4">
+        <div className="relative z-10 mt-10 flex flex-wrap items-center gap-4">
           <button className="btn btn-accent px-6 py-3.5 text-base" onClick={onEnter} type="button">
             {t.cta}
           </button>
@@ -163,9 +216,11 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
 
       {/* ── how it works ───────────────────────────────────────── */}
       <section className="relative mx-auto w-full max-w-6xl px-5 pb-20 sm:px-8">
+        <div className="paper-lines pointer-events-none absolute inset-0 opacity-30" aria-hidden />
         <div className="border-t divider pt-16" />
-        <h2 className="serif text-3xl font-semibold tracking-tight sm:text-4xl">{t.howTitle}</h2>
-        <div className="mt-10 grid gap-10 sm:grid-cols-2">
+        <SectionArtifact color={DEFAULT_STYLE.accent} />
+        <h2 className="serif relative z-10 text-3xl font-semibold tracking-tight sm:text-4xl">{t.howTitle}</h2>
+        <div className="relative z-10 mt-10 grid gap-10 sm:grid-cols-2">
           <HowBlock body={t.how1} />
           <HowBlock body={t.how2} />
           <HowBlock body={t.how3} />
@@ -176,6 +231,7 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
       {/* ── three voices ───────────────────────────────────────── */}
       <section className="relative mx-auto w-full max-w-6xl px-5 pb-20 sm:px-8">
         <div className="border-t divider pt-16" />
+        <SectionArtifact color={DEFAULT_STYLE.secondary} />
         <h2 className="serif text-3xl font-semibold tracking-tight sm:text-4xl">{t.voicesTitle}</h2>
         <div className="mt-10 grid gap-10 sm:grid-cols-3">
           <VoiceBlock
@@ -199,6 +255,7 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
       {/* ── engine ─────────────────────────────────────────────── */}
       <section className="relative mx-auto w-full max-w-6xl px-5 pb-20 sm:px-8">
         <div className="border-t divider pt-16" />
+        <SectionArtifact color={DEFAULT_STYLE.accent} />
         <h2 className="serif text-3xl font-semibold tracking-tight sm:text-4xl">{t.engineTitle}</h2>
         <div className="mt-10 grid gap-10 sm:grid-cols-2">
           <EngineBlock label="Motif" body={t.engineMotif} />
@@ -211,6 +268,7 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
       {/* ── see the music ──────────────────────────────────────── */}
       <section className="relative mx-auto w-full max-w-6xl px-5 pb-20 sm:px-8">
         <div className="border-t divider pt-16" />
+        <SectionArtifact color={DEFAULT_STYLE.secondary} />
         <h2 className="serif text-3xl font-semibold tracking-tight sm:text-4xl">{t.seeTitle}</h2>
         <div className="mt-10 grid gap-10 sm:grid-cols-2">
           <SeeBlock label="Signal Chain" body={t.seeChain} />
@@ -229,7 +287,7 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
           <p className="mt-4 text-sm t-faint">{t.footerHint}</p>
           <p className="mt-10 text-xs t-faint">
             Type2Song &middot; MIT License &middot;{" "}
-            <a className="underline underline-offset-2 hover:text-[var(--accent)]" href="https://github.com/EricJiang0423/type2song">
+            <a className="underline underline-offset-2 hover:text-[var(--accent)]" href={GITHUB_URL}>
               GitHub
             </a>
           </p>
@@ -239,20 +297,16 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
   );
 }
 
-/* ── tiny sub-components ───────────────────────────────────────────── */
+/* ── sub-components ──────────────────────────────────────────────── */
 
 function HowBlock({ body }: { body: string }) {
-  return (
-    <p className="text-base leading-7 t-dim sm:text-lg sm:leading-8">
-      {body}
-    </p>
-  );
+  return <p className="text-base leading-7 t-dim sm:text-lg sm:leading-8">{body}</p>;
 }
 
 function VoiceBlock({ name, desc, accent }: { name: string; desc: string; accent: string }) {
   return (
     <div>
-      <h3 className="serif text-2xl font-semibold" style={{ color: accent }}>
+      <h3 className="text-2xl font-semibold" style={{ color: accent }}>
         {name}
       </h3>
       <p className="mt-4 text-base leading-7 t-dim">{desc}</p>

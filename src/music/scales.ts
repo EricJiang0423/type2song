@@ -27,7 +27,7 @@ export const SCALES: Record<string, ScaleDefinition> = {
     id: "majorPentatonic",
     label: "Major Pentatonic",
     intervals: [0, 2, 4, 7, 9],
-    color: "#f2c76e",
+    color: "#c9956b",
   },
   minorPentatonic: {
     id: "minorPentatonic",

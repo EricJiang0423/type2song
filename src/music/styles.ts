@@ -64,7 +64,7 @@ export const STYLE_MODES: StyleModeConfig[] = [
       pad: 0.65,
       bass: 0.40,
     },
-    accent: "#f2c76e",
+    accent: "#c9956b",
     secondary: "#7fd5c6",
     background: "#15120f",
   },
