@@ -1,96 +1,145 @@
 # Type2Song
 
-A web instrument you play by typing.
+> **把打字变成音乐。不是键盘音效——是真的旋律、和弦和律动。**
 
-Type2Song is a browser-based creative instrument: you type normally, and every valid keystroke becomes part of a live musical performance. Instead of random keyboard clicks, it turns typing into scale-aware melodies, soft chord progressions, quantized rhythm, evolving motifs, and optional AI fills — so even messy typing sounds surprisingly musical.
+你每天都在打字。有没有想过，这些噼里啪啦的按键如果能变成音乐——不是单调的键盘声，而是真的旋律、和弦伴奏、有节奏的律动——会是什么感觉？
 
-It is part writing surface, part musical toy, part performance interface.
+Type2Song 就是这样一个东西：一个在浏览器里运行的乐器。你在输入框里正常打字，每一次按键都会实时生成音符。不需要学乐理、不需要 MIDI 键盘、不需要装任何东西——打开网页，打字，就是这样。
 
-[简体中文 README](./README.zh-CN.md)
+它像一个写作工具，也像一台可以随时演奏的乐器。
 
-## Why It Feels Different
+---
 
-Most "keyboard music" projects stop at key clicks. Type2Song treats typing as musical input.
+## 它有什么不一样
 
-- Your keys map to scale degrees, not fixed notes.
-- The melody stays inside the selected key and scale.
-- Background harmony gives every phrase musical context.
-- Typing is rate-limited to a musical pace, so fast bursts become a calm line instead of a wall of notes — a *Note density* slider lets you choose how sparse or responsive it feels. Keystrokes that get thinned out still leave a faint visual breadcrumb.
-- Recent motifs can echo, repeat, and evolve; an AI continuation only fills in after you pause.
-- Number Piano mode lets you play intentional melodies directly.
+大部分「键盘音乐」项目只是给按键挂上采样音色——按一个键响一个音，不构成音乐。
 
-## Highlights
+Type2Song 不是这样。
 
-- Real-time sound powered by Tone.js (loaded only after you click **Start Audio**, so it respects browser autoplay rules)
-- Instrument-style UI: a big writing stage with a note trail, ripples, a live "current note" display, an on-screen keyboard strip, and a signal-chain ribbon showing how each key becomes a note
-- Three style moods — **Lo-fi Night**, **Sad Piano**, **Cute Game BGM** — each with a tuned timbre preset; a **Recommended** button re-applies it, **Reset** returns to a neutral default
-- Key / Scale selector for changing the musical color
-- Number Piano mode: `1=C3 2=D3 3=E3 4=F3 5=G3 6=A3 7=B3 8=C4 9=D4 0=E4`
-- Scale-degree mode: `A S D F G H J K L` → degrees 1–9 of the current scale
-- Multi-key chord triggering by holding several valid keys
-- Timbre faders: brightness, warmth, attack, release, space, echo, pad, bass — plus the **Note density** control
-- Smart layer: Auto Mood, AI Continuation, Bassline, Drums
-- Live readout: current note, recent motif, generated phrase, and a step-by-step calculation view
-- Export to MIDI, WAV, or JSON
-- English / Chinese interface
+- **你的按键对应当前音阶的级数**，不是固定音高。在 C 大调里按 A 是 6 级音（La）；切到 A 小调，同一个 A 键就变成 1 级音（Do）——一条旋律线就这么出来了。
+- **后台有和弦进行在走**，给你打的每一个音提供和声上下文。随便敲几个字母，听起来就像一段即兴演奏。
+- **打字速度直接影响节奏和力度。** 慢敲是重音，快敲变成均匀的织体——你的打字习惯本身就是音乐表情。
+- **最近的音符会被记住。** 一段旋律会自己回响、重复、变奏。你停下来之后，AI 会接上去续写几个音——像另一个乐手在等你。
+- **猛敲不会变成一堵音墙。** 系统会自动限流到"音乐化"的速度，被跳过的按键会留一个很淡的视觉痕迹——你知道它在响应，但耳朵不会受罪。
 
-## Quick Start
+---
+
+## 看一眼
+
+**[点这里直接打开 → type2song](https://ericjiang0423.github.io/type2song/)**
+
+点 **Start Audio** → 开始打字。你不需要懂音乐。你只需要打字。
+
+你不需要懂音乐。你只需要打字。
+
+---
+
+## 功能
+
+- **三种气质风格**：Lo-fi Night（温暖的深夜感）、Sad Piano（柔和的钢琴叙事）、Cute Game BGM（像素游戏的活泼）。每一种都自带一套调好的音色参数。切风格，整个界面的颜色和声音气质都会跟着变。
+- **Key / Scale 选择**：7 种音阶 × 根音组合。想换色彩？下拉菜单就行了。
+- **两种演奏模式**：
+  - **音阶级数模式**：`A S D F G H J K L` → 当前音阶的级数 1–9。默认模式，适合自由输入。
+  - **数字钢琴模式**：`1=C3 2=D3 3=E3 4=F3 5=G3 6=A3 7=B3 8=C4 9=D4 0=E4`——固定音高，适合有意演奏。
+- **同时按键触发和弦**：按住多个有效键同时松手，会自动分配力量和声。
+- **8 个音色推子**：明亮度、温暖度、起音、尾音、空间、回声、铺底、低音。每个风格都有一个"推荐"预设——你也可以自己调，然后点「重置」回到中性默认。
+- **音符密度控制**：新的。调低 = 快敲时更克制、更稀疏；调高 = 几乎每个按键都出声。默认值经过实测，覆盖绝大部分输入习惯。
+- **Smart Layer**：
+  - Auto Mood：分析你打了什么字，自动切换风格。
+  - AI Continuation：你停下来后，AI 基于最近的 motif 续写几个音。
+  - Bassline：自动贝斯线。
+  - Drums：自动鼓组（Cute Game BGM 风格尤其好玩）。
+- **实时读数**：你正在弹什么音、最近 8 个 motif、AI 续写了什么、以及一个可视化的「计算链路」——每次按键经过级数映射→和声优化→八度平滑→量化→力度分配的全程，一目了然。
+- **音符轨迹**：一个迷你钢琴卷帘，实时展示最近 ~40 个音的音高和力度。
+- **生成链路条**：`按键 → 级数 → 和弦 → 节奏 → 音符` 五个节点用箭头串起来，每次按键一道光扫过——把"打字怎么变成音乐"讲清楚。
+- **导出**：MIDI / WAV / JSON。你演奏的段落可以变成可交换的格式。
+- **中英文界面**：右上角一键切换。
+
+---
+
+## 快速开始
 
 ```bash
+git clone https://github.com/EricJiang0423/type2song.git
+cd type2song
 npm install
 npm run dev
 ```
 
-Open `http://localhost:5173/`, click **Start Audio**, then type.
+打开 `http://localhost:5173/`，点 **Start Audio**，然后开始打字。
 
-## Build
+---
 
-```bash
-npm run build      # type-check + production bundle into dist/
-npm run preview    # serve the production build
+## 项目结构
+
 ```
-
-## Deploy (GitHub Pages)
-
-`.github/workflows/deploy.yml` builds the app and publishes `dist/` to GitHub Pages on every push to `main`.
-
-One-time setup on the repository:
-
-1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
-2. Push to `main` (or run the workflow manually from the Actions tab).
-
-The Vite `base` is set to `./` (relative), so the build works at the domain root and at a project subpath (`https://<user>.github.io/<repo>/`) without further config.
-
-## Tech Stack
-
-- React 18 + TypeScript
-- Vite
-- Tailwind CSS v4 (config-less; theme lives in `src/index.css`, PostCSS pipeline inlined in `vite.config.ts`)
-- Tone.js
-
-## Project Structure
-
-```text
 src/
-  main.tsx                Entry point
-  index.css               Tailwind import + custom visual styles & theme vars
-  vite-env.d.ts
+  main.tsx                入口
+  index.css               样式 + 主题变量（Tailwind v4，不另配 tailwind.config.js）
   ui/
-    App.tsx               Main interface, interaction wiring, and components
-    i18n.ts               English / Chinese copy
+    App.tsx               主界面、交互逻辑、所有组件
+    i18n.ts               中英文文案
   music/
-    audioEngine.ts        Tone.js synths, transport, playback, note-duration shaping
-    musicEngine.ts        Key → degree mapping, harmony selection, smoothing, motif memory, typing rate limit
-    harmonyEngine.ts      Scale-aware harmony and chord voicing
-    aiComposer.ts         Text-emotion analysis + motif continuation
-    keyMapping.ts         Keyboard and number-piano mappings
-    scales.ts             Scales, roots, note/degree math
-    styles.ts             Musical style presets (incl. recommended timbre)
-    timbre.ts             Timbre fader configuration
-    exporters.ts          MIDI / WAV / JSON export
+    audioEngine.ts        Tone.js 合成器、Transport、播放
+    musicEngine.ts        限流、按键→级数、和声选音、八度平滑、motif
+    harmonyEngine.ts      按音阶算和弦
+    aiComposer.ts         文字情绪分析 + motif 续写
+    keyMapping.ts         键盘映射 + 数字钢琴
+    scales.ts             音阶和音高数学
+    styles.ts             三种风格预设 + 推荐音色配置
+    timbre.ts             音色推子描述
+    exporters.ts          MIDI / WAV / JSON 导出
 .github/workflows/deploy.yml   GitHub Pages CI
 ```
 
-## Notes
+---
 
-Type2Song is client-only. The foundation is ready for more expressive features: richer sound design, recorded/shareable sessions, smarter continuation, and custom scales.
+## 部署
+
+推送到 GitHub 后自动部署到 Pages：
+
+```bash
+git push origin main
+# 或者去 Actions 标签页手动触发
+```
+
+访问：[https://ericjiang0423.github.io/type2song/](https://ericjiang0423.github.io/type2song/)
+
+---
+
+## 设计哲学
+
+### 输入行为是主角
+
+控制面板不应该抢走演奏的焦点。所以在布局上，书写区占据了左侧全部主舞台，右侧操作台可以独立滚动——调音色也好、切风格也好、看读数也好，键盘焦点始终在输入框上。
+
+### 克制是一种能力
+
+不是说只能加功能。限制"每个量化格最多一个音"、反转力度曲线让快敲变轻而不是变吵、把 AI 续写限制在停顿之后——这些决策比堆功能更能决定最终听感。
+
+### 浏览器就是乐器
+
+不需要安装。不需要注册。不需要连接硬件。打开网页就能演奏——这个门槛的降低本身就是设计目标。
+
+---
+
+## 技术栈
+
+React 18 · TypeScript · Vite · Tailwind CSS v4 · Tone.js
+
+纯前端项目。Tone.js 在用户点击 Start Audio 后加载，符合浏览器自动播放策略。
+
+---
+
+## 后续方向
+
+- 更丰富的合成器音色
+- 可录制、可分享的演奏片段
+- 更聪明的旋律续写
+- 自定义音阶
+
+---
+
+[MIT License](LICENSE) · 用打字来演奏。
+
+*[English README →](./README.en.md)*
