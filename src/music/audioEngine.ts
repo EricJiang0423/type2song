@@ -57,6 +57,9 @@ export class AudioEngine {
   };
   private timbre: TimbreOptions = { ...DEFAULT_TIMBRE_OPTIONS };
   private lastMelodySlot = -1;
+  private autoFilter: Tone.AutoFilter | null = null;
+  private autoPanner: Tone.AutoPanner | null = null;
+  private autoFilterLfo: Tone.Signal | null = null;
 
   constructor(style: StyleModeConfig, root: RootNote, scaleId: string) {
     this.style = style;
@@ -132,15 +135,16 @@ export class AudioEngine {
   }
 
   triggerKey(key: string, eventTimeMs: number, options?: ResolveKeyOptions): ResolveKeyResult {
-    const scheduledTime = this.getQuantizedTime();
-    const exportTimeSeconds = this.getExportTimeSeconds(scheduledTime);
+    // Resolve the key first so we can check isPhraseStart before scheduling.
     const chord = this.harmony.getCurrentChord();
+    const tempTime = this.getQuantizedTime();
+    const tempExport = this.getExportTimeSeconds(tempTime);
     const event = this.music.resolveKey(
       key,
       eventTimeMs,
       chord.scaleDegrees,
-      scheduledTime,
-      exportTimeSeconds,
+      tempTime,
+      tempExport,
       `${chord.rootName} ${chord.label}`,
       options,
     );
@@ -149,6 +153,16 @@ export class AudioEngine {
       return event;
     }
 
+    // Phrase-start notes align to the next measure boundary for a composed feel.
+    const scheduledTime = this.getQuantizedTime(event.isPhraseStart && !this.music.isBursting);
+    const exportTimeSeconds = this.getExportTimeSeconds(scheduledTime);
+    // Re-assign the correct schedule time to the event for the readout.
+    event.scheduledTime = scheduledTime;
+    event.exportTimeSeconds = exportTimeSeconds;
+
+    // Update spatial modulation rate from typing speed.
+    this.applyExpressionRate(this.music.getRollingAvgIntervalMs());
+
     // If this note lands on the same quantize slot as the previous one, pull it
     // back so a couple of fast keystrokes read as a soft dyad, not a thump.
     const stacked = Math.abs(scheduledTime - this.lastMelodySlot) < 1e-4;
@@ -156,6 +170,10 @@ export class AudioEngine {
     if (stacked) {
       event.velocity *= 0.55;
     }
+
+    // Stereo pan by degree — lower degrees lean left, higher lean right.
+    const pan = this.getPanForDegree(event.degree);
+    this.melodySynth?.set?.({ pan });
 
     this.melodySynth.triggerAttackRelease(
       event.noteName,
@@ -170,6 +188,12 @@ export class AudioEngine {
     }
 
     return event;
+  }
+
+  /** Map a scale degree to a stereo position: 1→L, 9→R, interpolated. */
+  private getPanForDegree(degree: number): number {
+    const normalised = clamp((degree - 1) / 8, 0, 1);
+    return -0.6 + normalised * 1.2; // -0.6 … +0.6 (not hard L/R)
   }
 
   triggerChord(keys: string[], eventTimeMs: number, options?: ResolveKeyOptions): ResolvedNoteEvent[] {
@@ -204,7 +228,10 @@ export class AudioEngine {
       velocity: event.velocity * chordGain,
     }));
 
+    this.applyExpressionRate(this.music.getRollingAvgIntervalMs());
+
     for (const event of events) {
+      this.melodySynth?.set?.({ pan: this.getPanForDegree(event.degree) });
       this.melodySynth.triggerAttackRelease(
         event.noteName,
         this.style.noteDuration,
@@ -262,7 +289,29 @@ export class AudioEngine {
       type: "lowpass",
       Q: this.getFilterQ(),
     }).connect(this.delay);
-    this.melodyGain = new Tone.Gain(0.78).connect(this.melodyFilter);
+
+    // AutoFilter: subtle filter sweep that responds to burst density.
+    this.autoFilter = new Tone.AutoFilter({
+      frequency: 0.06, // very slow sweep
+      depth: 0.18,
+      baseFrequency: 300,
+      type: "sine",
+      wet: 0.12,
+    }).connect(this.melodyFilter);
+
+    // AutoPanner: gentle stereo movement for spatial width.
+    this.autoPanner = new Tone.AutoPanner({
+      frequency: 0.04,
+      depth: 0.1,
+      wet: 0.2,
+    }).connect(this.autoFilter);
+
+    // Route the melody synth output through our spatial chain: gain → panner → filter → delay.
+    // Since PolySynth.connect() replaces its output, we connect the synth to melodyGain's input
+    // which then flows through the spatial chain. Actually for PolySynth we need to connect it
+    // directly — so let the synth connect to melodyGain and route the gain → spatial chain.
+    // Fix: melody synth connects to melodyGain, melodyGain feeds the spatial chain.
+    this.melodyGain = new Tone.Gain(0.78).connect(this.autoPanner!);
     this.padGain = new Tone.Gain(this.getPadGain()).connect(this.reverb);
     this.bassGain = new Tone.Gain(this.getBassGain()).connect(this.master);
     this.drumGain = new Tone.Gain(0.24).connect(this.master);
@@ -400,6 +449,18 @@ export class AudioEngine {
     this.melodyFilter?.Q.rampTo(this.getFilterQ(), 0.08);
   }
 
+  /** Adjust the spatial modulation rates based on the current typing tempo. */
+  private applyExpressionRate(avgIntervalMs: number | null): void {
+    if (!this.autoFilter || !this.autoPanner) return;
+    // Faster typing → slightly more active modulation (shortens the LFO cycle).
+    // The mapping: avg 60ms → ~0.18 Hz, avg 500ms+ → ~0.04 Hz.
+    const norm = avgIntervalMs !== null ? clamp(avgIntervalMs / 500, 0.12, 1) : 0.5;
+    const filterRate = 0.04 + (1 - norm) * 0.18;
+    const pannerRate = 0.03 + (1 - norm) * 0.1;
+    this.autoFilter.frequency.rampTo(filterRate, 0.2);
+    this.autoPanner.frequency.rampTo(pannerRate, 0.2);
+  }
+
   private getMelodyNoteDuration(elapsedMs: number): string | number {
     // When notes follow closely, shorten them so their tails do not stack into mud.
     // Mostly matters for the long-sustaining Sad Piano ("4n") preset; slow,
@@ -491,10 +552,27 @@ export class AudioEngine {
     }, "8n");
   }
 
-  private getQuantizedTime(): number {
+  /** Returns a quantized schedule time. When `alignToMeasure` is true and the
+   *  transport is running, snaps to the next measure boundary (full bar) for a
+   *  "phrase start" feel. */
+  private getQuantizedTime(alignToMeasure = false): number {
     const now = Tone.now();
     if (Tone.Transport.state !== "started") {
       return now + 0.01;
+    }
+
+    if (alignToMeasure) {
+      // Align to the next full-measure boundary.
+      const transport = Tone.Transport as unknown as {
+        nextSubdivision?: (sub: string) => number;
+      };
+      const nextMeasure = transport.nextSubdivision?.("1m");
+      if (typeof nextMeasure === "number" && Number.isFinite(nextMeasure)) {
+        return Math.max(nextMeasure, now + 0.01);
+      }
+      // Fallback: four times the basic quantize step.
+      const fourBars = Tone.Time("4n").toSeconds() * 4;
+      return Math.ceil(now / fourBars + 0.001) * fourBars;
     }
 
     const transport = Tone.Transport as unknown as {
@@ -526,6 +604,8 @@ export class AudioEngine {
     this.snareSynth?.dispose();
     this.hatSynth?.dispose();
     this.melodyFilter?.dispose();
+    this.autoFilter?.dispose();
+    this.autoPanner?.dispose();
     this.delay?.dispose();
     this.reverb?.dispose();
     this.melodyGain?.dispose();
@@ -541,6 +621,8 @@ export class AudioEngine {
     this.snareSynth = null;
     this.hatSynth = null;
     this.melodyFilter = null;
+    this.autoFilter = null;
+    this.autoPanner = null;
     this.delay = null;
     this.reverb = null;
     this.melodyGain = null;

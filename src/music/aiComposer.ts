@@ -2,6 +2,9 @@ import { degreeToMidi, getScale, midiToNoteName, type RootNote } from "./scales"
 import type { MotifNote } from "./musicEngine";
 import type { GeneratedPlaybackNote } from "./audioEngine";
 
+/** How many original gap "ticks" map to one continuation step. */
+const RHYTHM_SCALE = 0.55;
+
 export type Emotion = "calm" | "sad" | "energy" | "cute" | "neutral";
 
 export interface EmotionAnalysis {
@@ -73,23 +76,42 @@ export function generateMotifContinuation(
   const scale = getScale(scaleId);
   const source = motif.slice(-4);
   const degrees = source.map((note) => note.degree);
+
+  // Also capture the rhythm pattern (inter-keystroke gaps) from the source.
+  const gaps = source.map((note) => note.elapsedMs).filter((g) => !isNaN(g) && g > 0);
+
   const intervals = degrees.slice(1).map((degree, index) => degree - degrees[index]);
   const lastDegree = degrees[degrees.length - 1];
-  const transformed = intervals.length > 0 ? [...intervals].reverse().map((interval) => clamp(interval, -2, 2)) : [1, -1, 2];
+  const transformed =
+    intervals.length > 0
+      ? [...intervals].reverse().map((interval) => clamp(interval, -2, 2))
+      : [1, -1, 2];
 
   let cursor = lastDegree;
   return transformed.slice(0, 4).map((interval, index) => {
     cursor = Math.max(1, cursor + interval);
     const midi = smoothGeneratedMidi(degreeToMidi(root, scale, cursor, 3), source[source.length - 1].midi);
 
+    // Derive delay from the source rhythm pattern when available.
+    const gapIndex = index % Math.max(1, gaps.length);
+    const rhythmDelay = gaps[gapIndex]
+      ? Math.max(0.5, Math.round((gaps[gapIndex] * RHYTHM_SCALE) / 100))
+      : 1;
+    const delaySteps = index === 0 ? 1 : Math.max(1, rhythmDelay);
+
     return {
       degree: ((cursor - 1) % scale.intervals.length) + 1,
       midi,
       noteName: midiToNoteName(midi),
       velocity: Math.max(0.28, 0.58 - index * 0.07),
-      delaySteps: index + 1,
-      durationSteps: index === transformed.length - 1 ? 2 : 1,
-      reason: index % 2 === 0 ? "mirrored motif interval" : "scale-neighbor variation",
+      delaySteps,
+      durationSteps: gaps[gapIndex] && gaps[gapIndex] > 300 ? 2 : 1,
+      reason:
+        gaps[gapIndex] && gaps[gapIndex] > 300
+          ? "rhythm-aware (slow gap → long note)"
+          : index % 2 === 0
+            ? "mirrored motif interval"
+            : "scale-neighbor variation",
     };
   });
 }

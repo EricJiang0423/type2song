@@ -34,6 +34,8 @@ export interface MotifNote {
   noteName: string;
   velocity: number;
   variant: MotifVariant;
+  /** Time (ms) since the previous sounded note; NaN for the first note. */
+  elapsedMs: number;
 }
 
 export interface ResolvedNoteEvent extends MotifNote {
@@ -56,6 +58,8 @@ export interface ResolvedNoteEvent extends MotifNote {
   inputMode: InputMode;
   calculation: CalculationStep[];
   motif: MotifNote[];
+  /** True when this note follows a pause longer than ~550 ms — signals a phrase boundary. */
+  isPhraseStart: boolean;
 }
 
 export interface ResolveKeyOptions {
@@ -63,6 +67,9 @@ export interface ResolveKeyOptions {
   /** Skip the per-keystroke rate limit (used for intentional chords). */
   bypassRateLimit?: boolean;
 }
+
+export const PHRASE_PAUSE_MS = 550;
+const ROLLING_WINDOW_SIZE = 8;
 
 export class MusicEngine {
   private root: RootNote;
@@ -74,6 +81,8 @@ export class MusicEngine {
   private motif: MotifNote[] = [];
   /** 0 = sparse & calm, 1 = responsive (a note for almost every keystroke). */
   private density = 0.55;
+  /** Rolling window of inter-keystroke intervals (ms) for adaptive feel. */
+  private rollingIntervals: number[] = [];
 
   constructor(root: RootNote, scaleId: string, quantize: QuantizeValue) {
     this.root = root;
@@ -87,6 +96,7 @@ export class MusicEngine {
     this.lastMidi = null;
     this.lastKeyTime = null;
     this.motif = [];
+    this.rollingIntervals = [];
   }
 
   setQuantize(quantize: QuantizeValue): void {
@@ -99,6 +109,18 @@ export class MusicEngine {
 
   getMotif(): MotifNote[] {
     return [...this.motif];
+  }
+
+  /** Rolling average inter-keystroke interval (ms), or null when not enough data. */
+  getRollingAvgIntervalMs(): number | null {
+    if (this.rollingIntervals.length < 3) return null;
+    return this.rollingIntervals.reduce((a, b) => a + b, 0) / this.rollingIntervals.length;
+  }
+
+  /** True if the user is in a fast-burst typing pattern. */
+  get isBursting(): boolean {
+    const avg = this.getRollingAvgIntervalMs();
+    return avg !== null && avg < 160;
   }
 
   /**
@@ -145,9 +167,18 @@ export class MusicEngine {
       return RATE_LIMITED;
     }
 
+    // Track rolling interval for adaptive feel.
+    if (this.lastKeyTime !== null) {
+      this.rollingIntervals.push(rawElapsed);
+      if (this.rollingIntervals.length > ROLLING_WINDOW_SIZE) {
+        this.rollingIntervals.shift();
+      }
+    }
+
     const scale = getScale(this.scaleId);
     const elapsed = Math.max(24, rawElapsed);
-    const strongInput = this.noteCount % 4 === 0 || elapsed > 520;
+    const isPause = this.lastKeyTime === null || rawElapsed > PHRASE_PAUSE_MS;
+    const strongInput = this.noteCount % 4 === 0 || isPause;
     const motifAdjusted = this.applyMotifMemory(mapping.degree, scale.intervals.length);
     const harmonic = this.chooseBestHarmonicCandidate(
       mapping.degree,
@@ -166,6 +197,7 @@ export class MusicEngine {
       noteName,
       velocity,
       variant: harmonic.variant,
+      elapsedMs: rawElapsed,
     };
 
     const calculation = this.buildCalculationSteps({
@@ -184,6 +216,7 @@ export class MusicEngine {
       variant: motifNote.variant,
       harmonyScore: harmonic.score,
       harmonyReason: harmonic.reason,
+      isPause,
     });
 
     this.lastMidi = smoothing.midi;
@@ -212,6 +245,7 @@ export class MusicEngine {
       inputMode: "scale-degree",
       calculation,
       motif: this.getMotif(),
+      isPhraseStart: isPause && this.noteCount > 0,
     };
   }
 
@@ -224,7 +258,16 @@ export class MusicEngine {
     exportTimeSeconds: number,
     chordLabel: string,
   ): ResolvedNoteEvent {
-    const elapsed = this.lastKeyTime === null ? 420 : Math.max(24, eventTimeMs - this.lastKeyTime);
+    const rawElapsed = this.lastKeyTime === null ? 420 : Math.max(0, eventTimeMs - this.lastKeyTime);
+    // Track intervals for piano mode too.
+    if (this.lastKeyTime !== null) {
+      this.rollingIntervals.push(rawElapsed);
+      if (this.rollingIntervals.length > ROLLING_WINDOW_SIZE) {
+        this.rollingIntervals.shift();
+      }
+    }
+    const elapsed = Math.max(24, rawElapsed);
+    const isPause = this.lastKeyTime === null || rawElapsed > PHRASE_PAUSE_MS;
     const velocity = this.calculateVelocity(elapsed, {
       degree: direct.degree,
       keyClass: "digit",
@@ -238,6 +281,7 @@ export class MusicEngine {
       noteName,
       velocity,
       variant: "direct",
+      elapsedMs: rawElapsed,
     };
     const calculation = this.buildDirectPianoCalculationSteps({
       keyLabel: direct.label,
@@ -275,6 +319,7 @@ export class MusicEngine {
       inputMode: "number-piano",
       calculation,
       motif: this.getMotif(),
+      isPhraseStart: isPause && this.noteCount > 0,
     };
   }
 
@@ -421,6 +466,7 @@ export class MusicEngine {
     variant: MotifVariant;
     harmonyScore: number;
     harmonyReason: string;
+    isPause: boolean;
   }): CalculationStep[] {
     const scale = getScale(this.scaleId);
     const chordDegreeText = input.chordDegrees.length > 0 ? input.chordDegrees.join(", ") : "-";
@@ -458,8 +504,10 @@ export class MusicEngine {
       {
         id: "rhythm",
         label: "Rhythm",
-        value: input.quantize,
-        detail: `${Math.round(input.elapsed)}ms since previous key`,
+        value: input.isPause ? "phrase · " + input.quantize : input.quantize,
+        detail: input.isPause
+          ? `phrase start · ${Math.round(input.elapsed)}ms gap`
+          : `${Math.round(input.elapsed)}ms since previous key`,
         tone: "rhythm",
       },
       {
