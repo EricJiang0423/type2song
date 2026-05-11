@@ -57,6 +57,17 @@ interface SmartOptions {
   drums: boolean;
 }
 
+/** Shape of the parameter snapshot exposed to / accepted from the tuning harness. */
+interface T2SParams {
+  density: number;
+  timbre: TimbreOptions;
+  numberPianoMode: boolean;
+  smartOptions: SmartOptions;
+  styleId: string;
+  root: string;
+  scaleId: string;
+}
+
 type AppStyle = CSSProperties & {
   "--accent": string;
   "--secondary": string;
@@ -117,7 +128,7 @@ export default function App() {
     drums: false,
   });
   const [timbreOptions, setTimbreOptions] = useState<TimbreOptions>(DEFAULT_STYLE.recommendedTimbre);
-  const [density, setDensity] = useState(0.55);
+  const [density, setDensity] = useState(0.60);
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const [rollNotes, setRollNotes] = useState<RollNote[]>([]);
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
@@ -200,6 +211,43 @@ export default function App() {
     }
     engineRef.current?.setEmotionParams(articulationBias, brightnessBias);
   }, [emotion]);
+
+  // ---- Headless tuning harness API ----------------------------------------
+  // Exposed on `window` so Playwright (tuning/pipeline.ts) can drive the engine
+  // via page.evaluate(). Re-assigned every render so getParams reads fresh state.
+  useEffect(() => {
+    const w = window as unknown as Record<string, unknown>;
+
+    w.__t2s_setParams = (params: Partial<T2SParams>) => {
+      if (typeof params.density === "number") setDensity(params.density);
+      if (params.timbre) setTimbreOptions((current) => ({ ...current, ...params.timbre }));
+      if (typeof params.numberPianoMode === "boolean") setNumberPianoMode(params.numberPianoMode);
+      if (params.smartOptions) setSmartOptions((current) => ({ ...current, ...params.smartOptions }));
+      // styleId is applied directly (not via applyStyle) so an explicit
+      // root/scale/timbre passed alongside it is not clobbered by the preset.
+      if (params.styleId) setStyleId(params.styleId);
+      if (params.root) setRoot(params.root as RootNote);
+      if (params.scaleId) setScaleId(params.scaleId);
+    };
+
+    w.__t2s_getParams = (): T2SParams => ({
+      density,
+      timbre: timbreOptions,
+      numberPianoMode,
+      smartOptions,
+      styleId,
+      root,
+      scaleId,
+    });
+
+    w.__t2s_getState = () => ({ isPlaying, hasEngine: !!engineRef.current });
+
+    w.__t2s_record = (durationMs: number): Promise<string> => {
+      const engine = engineRef.current;
+      if (!engine) return Promise.reject(new Error("audio engine not started"));
+      return engine.captureWav(durationMs);
+    };
+  });
 
   async function handleStartAudio() {
     const engine = await getOrCreateEngine();

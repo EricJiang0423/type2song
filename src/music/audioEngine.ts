@@ -147,6 +147,64 @@ export class AudioEngine {
     this.music.setDensity(density);
   }
 
+  /** The master output Gain (exposed so the tuning harness can tap it). */
+  get masterNode(): Tone.Gain | null {
+    return this.master;
+  }
+
+  /**
+   * Record `durationMs` of the live master output and return it as a base64
+   * string. Used by the headless tuning harness (`window.__t2s_record`).
+   *
+   * Tone.js runs on `standardized-audio-context`, which deliberately omits the
+   * deprecated `ScriptProcessorNode`, so we tap the graph via a
+   * `MediaStreamAudioDestinationNode` + `MediaRecorder`. Chromium records that
+   * stream as WebM; the Python scorer decodes it. Returns
+   * `"<base64>"` — caller may prefix with the mime type via `recordWithMime`.
+   */
+  async captureWav(durationMs: number): Promise<string> {
+    return (await this.captureAudio(durationMs)).base64;
+  }
+
+  /** Like `captureWav` but also reports the recorded container's mime type. */
+  async captureAudio(durationMs: number): Promise<{ base64: string; mime: string }> {
+    if (!this.master) {
+      throw new Error("audio graph not ready");
+    }
+    const ctx = Tone.getContext().rawContext as unknown as BaseAudioContext & {
+      createMediaStreamDestination(): MediaStreamAudioDestinationNode;
+    };
+    const dest = ctx.createMediaStreamDestination();
+    // Tap the master output without disturbing the path to the speakers.
+    this.master.connect(dest);
+
+    const mime = pickRecorderMime();
+    const recorder = new MediaRecorder(dest.stream, mime ? { mimeType: mime } : undefined);
+    const chunks: Blob[] = [];
+
+    const done = new Promise<Blob>((resolve, reject) => {
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) chunks.push(event.data);
+      };
+      recorder.onerror = () => reject(new Error("MediaRecorder error"));
+      recorder.onstop = () => resolve(new Blob(chunks, { type: recorder.mimeType || mime || "audio/webm" }));
+    });
+
+    recorder.start();
+    await new Promise<void>((resolve) => setTimeout(resolve, Math.max(100, durationMs)));
+    recorder.stop();
+    const blob = await done;
+
+    try {
+      this.master.disconnect(dest);
+    } catch {
+      /* already disconnected */
+    }
+
+    const buffer = await blob.arrayBuffer();
+    return { base64: arrayBufferToBase64(buffer), mime: blob.type || "audio/webm" };
+  }
+
   triggerKey(key: string, eventTimeMs: number, options?: ResolveKeyOptions): ResolveKeyResult {
     // Resolve the key first so we can check isPhraseStart before scheduling.
     const chord = this.harmony.getCurrentChord();
@@ -426,24 +484,24 @@ export class AudioEngine {
     }
 
     if (this.style.synthPreset === "piano") {
-      // Felt-piano flavour: keep the FM modulation low so it stays warm and woody
-      // instead of metallic, with a soft hammer "ping" that decays into a pure body.
+      // FM piano: high mod index → bright hammer strike → fast mod decay
+      // → warm sustained body.  Carrier=envelope-decaying sine, modulator=sine.
       return {
-        harmonicity: 1.4 + this.timbre.brightness * 1.5,
-        modulationIndex: 1.6 + this.timbre.brightness * 4.0,
-        oscillator: { type: "triangle" },
+        harmonicity: 3.0 + this.timbre.brightness * 4.0,
+        modulationIndex: 6.0 + this.timbre.brightness * 14.0,
+        oscillator: { type: "sine" },
         modulation: { type: "sine" },
         envelope: {
-          attack: 0.003 + this.timbre.attack * 0.022,
-          decay: 0.7 + this.timbre.warmth * 1.2,
-          sustain: 0.01 + this.timbre.warmth * 0.05,
-          release: 0.8 + this.timbre.release * 1.9,
+          attack: 0.001 + this.timbre.attack * 0.01,
+          decay: 0.4 + this.timbre.warmth * 0.8,
+          sustain: 0.02 + this.timbre.warmth * 0.05,
+          release: 0.5 + this.timbre.release * 2.0,
         },
         modulationEnvelope: {
-          attack: 0.002,
-          decay: 0.16 + this.timbre.brightness * 0.4,
+          attack: 0.001,
+          decay: 0.06 + this.timbre.brightness * 0.28,
           sustain: 0,
-          release: 0.1 + this.timbre.release * 0.25,
+          release: 0.04,
         },
       };
     }
@@ -668,4 +726,24 @@ export class AudioEngine {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+/** Prefer a lossless PCM-in-WebM recording when the browser supports it. */
+function pickRecorderMime(): string | undefined {
+  const candidates = ["audio/webm;codecs=pcm", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
+  if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
+    return undefined;
+  }
+  return candidates.find((type) => MediaRecorder.isTypeSupported(type));
+}
+
+/** Base64-encode an ArrayBuffer in chunks (avoids call-stack limits on big blobs). */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize)));
+  }
+  return btoa(binary);
 }
