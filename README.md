@@ -36,7 +36,7 @@ Type2Song 不是这样。
 
 ## 功能
 
-- **三种气质风格**：Lo-fi Night（温暖的深夜感）、Sad Piano（柔和的钢琴叙事）、Cute Game BGM（像素游戏的活泼）。每一种都自带一套调好的音色参数。切风格，整个界面的颜色和声音气质都会跟着变。
+- **三种气质风格**：Lo-fi Night（温暖的深夜感）、Ethereal Keys（空灵的敲击音色）、Cute Game BGM（像素游戏的活泼）。每一种都自带一套调好的音色参数。切风格，整个界面的颜色和声音气质都会跟着变。
 - **Key / Scale 选择**：7 种音阶 × 根音组合。想换色彩？下拉菜单就行了。
 - **两种演奏模式**：
   - **音阶级数模式**：`A S D F G H J K L` → 当前音阶的级数 1–9。默认模式，适合自由输入。
@@ -140,5 +140,3 @@ React 18 · TypeScript · Vite · Tailwind CSS v4 · Tone.js
 ---
 
 [MIT License](LICENSE) · 用打字来演奏。
-
-*[English README →](./README.en.md)*

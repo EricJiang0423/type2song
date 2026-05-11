@@ -24,7 +24,7 @@ const EMOTION_KEYWORDS: Record<Exclude<Emotion, "neutral">, string[]> = {
 
 const EMOTION_STYLE: Record<Emotion, string> = {
   calm: "lofi-night",
-  sad: "sad-piano",
+  sad: "ethereal-keys",
   energy: "cute-game-bgm",
   cute: "cute-game-bgm",
   neutral: "lofi-night",

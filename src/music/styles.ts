@@ -69,8 +69,8 @@ export const STYLE_MODES: StyleModeConfig[] = [
     background: "#15120f",
   },
   {
-    id: "sad-piano",
-    label: "Sad Piano",
+    id: "ethereal-keys",
+    label: "Ethereal Keys",
     bpm: 62,
     defaultRoot: "A",
     defaultScale: "naturalMinor",
