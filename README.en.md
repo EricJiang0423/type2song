@@ -50,7 +50,6 @@ Click **Start Audio**, then type. That's all.
 - **Live readout**: current note, last 8 motif notes, AI-generated phrase, and a visual "signal chain" showing exactly how each keystroke becomes a note.
 - **Note trail**: a mini piano roll showing pitch and velocity of the last ~40 notes.
 - **Signal chain ribbon**: `Key → degree → chord → rhythm → note` with a pulse sweeping through on every keystroke.
-- **Export**: MIDI / WAV / JSON. Your session is a portable format.
 - **English / Chinese UI**: toggle in the header.
 
 ---

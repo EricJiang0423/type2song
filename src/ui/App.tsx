@@ -12,14 +12,6 @@ import { COPY, type Language } from "./i18n";
 import type { AudioEngine, ArrangementOptions, GeneratedPlaybackEvent } from "../music/audioEngine";
 import { analyzeTextEmotion, generateMotifContinuation, type EmotionAnalysis } from "../music/aiComposer";
 import {
-  createJsonBlob,
-  createMidiBlob,
-  createWavBlob,
-  downloadBlob,
-  type CapturedNote,
-  type ExportSession,
-} from "../music/exporters";
-import {
   KEY_SCALE_OPTIONS,
   degreeToMidi,
   getScale,
@@ -117,7 +109,6 @@ export default function App() {
   const [lastNote, setLastNote] = useState<ResolvedNoteEvent | null>(null);
   const [motif, setMotif] = useState<MotifNote[]>([]);
   const [generatedPhrase, setGeneratedPhrase] = useState<GeneratedPlaybackEvent[]>([]);
-  const [sessionNotes, setSessionNotes] = useState<CapturedNote[]>([]);
   const [emotion, setEmotion] = useState<EmotionAnalysis>(() => analyzeTextEmotion(""));
   const [smartOptions, setSmartOptions] = useState<SmartOptions>({
     autoMood: false,
@@ -311,20 +302,17 @@ export default function App() {
       return;
     }
 
-    const captured: CapturedNote[] = [];
     const newRipples: Ripple[] = [];
     const newRoll: RollNote[] = [];
 
     for (const noteEvent of noteEvents) {
       typedNoteCountRef.current += 1;
-      captured.push(captureTypedNote(noteEvent, styleMode.bpm));
       const chordTone = noteEvent.variant === "direct" || noteEvent.inputMode === "number-piano";
       const color = chordTone ? styleMode.accent : styleMode.secondary;
       newRipples.push(makeRipple(noteEvent.inputDegree, noteEvent.velocity, color, noteNameWithoutOctave(noteEvent.noteName)));
       newRoll.push({ id: nextVisualId(), pitch: pitchToNorm(noteEvent.midi), velocity: noteEvent.velocity, color, ai: false });
     }
 
-    setSessionNotes((current) => [...current, ...captured].slice(-2048));
     setRipples((current) => [...current, ...newRipples].slice(-18));
     setRollNotes((current) => [...current, ...newRoll].slice(-40));
     flashKeys(sourceKey);
@@ -387,7 +375,6 @@ export default function App() {
     }
 
     setGeneratedPhrase(played);
-    setSessionNotes((current) => [...current, ...played.map((note) => captureGeneratedNote(note))].slice(-2048));
 
     const newRipples: Ripple[] = [];
     const newRoll: RollNote[] = [];
@@ -412,35 +399,6 @@ export default function App() {
       ...current,
       [key]: value,
     }));
-  }
-
-  function handleExport(kind: "midi" | "wav" | "json") {
-    const session = buildExportSession();
-    const suffix = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-
-    if (kind === "midi") {
-      downloadBlob(createMidiBlob(session), `type2song-${suffix}.mid`);
-    } else if (kind === "wav") {
-      downloadBlob(createWavBlob(session), `type2song-${suffix}.wav`);
-    } else {
-      downloadBlob(createJsonBlob(session), `type2song-${suffix}.json`);
-    }
-  }
-
-  function buildExportSession(): ExportSession {
-    return {
-      title: "Type2Song",
-      text,
-      styleId: styleMode.id,
-      styleLabel: styleMode.label,
-      root,
-      scaleLabel: currentScale.label,
-      bpm: styleMode.bpm,
-      synthPreset: styleMode.synthPreset,
-      timbre: timbreOptions,
-      createdAt: new Date().toISOString(),
-      notes: normalizeCapturedNotes(sessionNotes),
-    };
   }
 
   function nextVisualId(): number {
@@ -799,25 +757,14 @@ export default function App() {
             </div>
           </section>
 
-          {/* EXPORT -------------------------------------------------------- */}
+          {/* SESSION STATS ------------------------------------------------- */}
           <section className="flex flex-col gap-3 border-t divider pt-4">
-            <SectionTitle>{t.export}</SectionTitle>
-            <div className="grid grid-cols-3 gap-2">
-              <button className="btn mono px-2 py-2 text-sm" disabled={sessionNotes.length === 0} onClick={() => handleExport("midi")} type="button">
-                {t.midi}
-              </button>
-              <button className="btn mono px-2 py-2 text-sm" disabled={sessionNotes.length === 0} onClick={() => handleExport("wav")} type="button">
-                {t.wav}
-              </button>
-              <button className="btn mono px-2 py-2 text-sm" disabled={sessionNotes.length === 0} onClick={() => handleExport("json")} type="button">
-                {t.json}
-              </button>
-            </div>
+            <SectionTitle>{t.session}</SectionTitle>
             <div className="grid grid-cols-4 gap-2">
               <Stat label={t.chars} value={`${text.length}`} />
-              <Stat label={t.notes} value={`${sessionNotes.length}`} />
+              <Stat label={t.notes} value={`${typedNoteCountRef.current}`} />
               <Stat label={t.root} value={root} />
-              <Stat label={t.scale} value={shortScale(currentScale.label)} />
+              <Stat label={t.scale} value={currentScale.label.replace(" Pentatonic", " Penta")} />
             </div>
           </section>
         </aside>
@@ -1080,51 +1027,6 @@ function pitchToNorm(midi: number): number {
   return clamp((midi - 36) / 48, 0, 1);
 }
 
-function shortScale(label: string): string {
-  return label.replace(" Pentatonic", " Penta");
-}
-
-function captureTypedNote(note: ResolvedNoteEvent, bpm: number): CapturedNote {
-  return {
-    noteName: note.noteName,
-    midi: note.midi,
-    degree: note.degree,
-    velocity: note.velocity,
-    timeSeconds: note.exportTimeSeconds,
-    durationSeconds: durationToSeconds(note.quantize, bpm) * (note.quantize === "8n" ? 1.15 : 1.4),
-    source: "typed",
-    chordLabel: note.chordLabel,
-    variant: note.variant,
-    keyLabel: note.keyLabel,
-  };
-}
-
-function captureGeneratedNote(note: GeneratedPlaybackEvent): CapturedNote {
-  return {
-    noteName: note.noteName,
-    midi: note.midi,
-    degree: note.degree,
-    velocity: note.velocity,
-    timeSeconds: note.exportTimeSeconds,
-    durationSeconds: note.durationSeconds,
-    source: "ai",
-    chordLabel: "AI",
-    variant: note.reason,
-  };
-}
-
-function normalizeCapturedNotes(notes: CapturedNote[]): CapturedNote[] {
-  if (notes.length === 0) {
-    return [];
-  }
-
-  const start = Math.min(...notes.map((note) => note.timeSeconds));
-  return notes.map((note) => ({
-    ...note,
-    timeSeconds: Math.max(0, note.timeSeconds - start),
-  }));
-}
-
 function getPlayableComposingKey(key: string): string | null {
   if (/^[a-z0-9]$/i.test(key)) {
     return key;
@@ -1151,11 +1053,6 @@ function isComposedLanguageCharacter(char: string): boolean {
     (codePoint >= 0x3040 && codePoint <= 0x30ff) ||
     (codePoint >= 0xac00 && codePoint <= 0xd7af)
   );
-}
-
-function durationToSeconds(duration: "8n" | "16n", bpm: number): number {
-  const quarter = 60 / bpm;
-  return duration === "8n" ? quarter / 2 : quarter / 4;
 }
 
 function clamp(value: number, min: number, max: number): number {
