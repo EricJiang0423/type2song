@@ -1,6 +1,6 @@
 import { degreeToMidi, getScale, midiToNoteName, type RootNote } from "./scales";
 import type { MotifNote } from "./musicEngine";
-import type { GeneratedPlaybackNote } from "./audioEngine";
+import type { GeneratedPlaybackNote } from "./audioTypes";
 
 /** How many original gap "ticks" map to one continuation step. */
 const RHYTHM_SCALE = 0.55;

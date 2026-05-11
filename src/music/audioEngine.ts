@@ -1,30 +1,10 @@
 import * as Tone from "tone";
+import type { ArrangementOptions, GeneratedPlaybackEvent, GeneratedPlaybackNote } from "./audioTypes";
 import { HarmonyEngine } from "./harmonyEngine";
 import { MusicEngine, RATE_LIMITED, type KeyRegion, type ResolveKeyOptions, type ResolveKeyResult, type ResolvedNoteEvent } from "./musicEngine";
 import type { RootNote } from "./scales";
 import type { StyleModeConfig } from "./styles";
 import { DEFAULT_TIMBRE_OPTIONS, type TimbreOptions } from "./timbre";
-
-export interface ArrangementOptions {
-  bassEnabled: boolean;
-  drumsEnabled: boolean;
-  padEnabled: boolean;
-}
-
-export interface GeneratedPlaybackNote {
-  degree: number;
-  midi: number;
-  noteName: string;
-  velocity: number;
-  delaySteps: number;
-  durationSteps: number;
-  reason: string;
-}
-
-export interface GeneratedPlaybackEvent extends GeneratedPlaybackNote {
-  exportTimeSeconds: number;
-  durationSeconds: number;
-}
 
 export class AudioEngine {
   private style: StyleModeConfig;

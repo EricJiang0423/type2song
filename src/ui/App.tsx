@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { COPY, type Language } from "./i18n";
-import type { AudioEngine, ArrangementOptions, GeneratedPlaybackEvent } from "../music/audioEngine";
+import type { ArrangementOptions, AudioEngineRuntime, GeneratedPlaybackEvent } from "../music/audioTypes";
 import { analyzeTextEmotion, generateMotifContinuation, type EmotionAnalysis } from "../music/aiComposer";
 import {
   KEY_SCALE_OPTIONS,
@@ -28,6 +28,7 @@ import {
   type ResolveKeyResult,
   type ResolvedNoteEvent,
 } from "../music/musicEngine";
+import { LandingPage } from "./LandingPage";
 
 type Strings = (typeof COPY)[Language];
 
@@ -109,7 +110,35 @@ const STEP_TONE_COLOR: Record<CalculationStep["tone"], string> = {
   output: "#a8ec7b",
 };
 
+type RouteView = "home" | "studio";
+
 export default function App() {
+  const [view, setView] = useState<RouteView>(() => getRouteView());
+
+  useEffect(() => {
+    const syncRoute = () => setView(getRouteView());
+    window.addEventListener("hashchange", syncRoute);
+    window.addEventListener("popstate", syncRoute);
+    return () => {
+      window.removeEventListener("hashchange", syncRoute);
+      window.removeEventListener("popstate", syncRoute);
+    };
+  }, []);
+
+  function openStudio() {
+    window.location.hash = "studio";
+    setView("studio");
+  }
+
+  function openHome() {
+    window.history.pushState(null, "", `${window.location.pathname}${window.location.search}`);
+    setView("home");
+  }
+
+  return view === "studio" ? <StudioApp onBackHome={openHome} /> : <LandingPage onEnter={openStudio} />;
+}
+
+function StudioApp({ onBackHome }: { onBackHome: () => void }) {
   const [language, setLanguage] = useState<Language>("zh");
   const [styleId, setStyleId] = useState(DEFAULT_STYLE.id);
   const [root, setRoot] = useState<RootNote>(DEFAULT_STYLE.defaultRoot);
@@ -134,7 +163,7 @@ export default function App() {
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
   const [pulseId, setPulseId] = useState(0);
 
-  const engineRef = useRef<AudioEngine | null>(null);
+  const engineRef = useRef<AudioEngineRuntime | null>(null);
   const pressedKeysRef = useRef<Set<string>>(new Set());
   const lastCompositionDataRef = useRef("");
   const lastCompositionSoundRef = useRef("");
@@ -264,7 +293,7 @@ export default function App() {
     setIsPlaying(false);
   }
 
-  async function getOrCreateEngine(): Promise<AudioEngine> {
+  async function getOrCreateEngine(): Promise<AudioEngineRuntime> {
     if (!engineRef.current) {
       const { AudioEngine: AudioEngineConstructor } = await import("../music/audioEngine");
       engineRef.current = new AudioEngineConstructor(styleMode, root, scaleId);
@@ -541,6 +570,9 @@ export default function App() {
           <span className="hidden truncate text-sm t-dim sm:inline">{t.subtitle}</span>
         </div>
         <div className="flex items-center gap-2">
+          <button className="btn hidden px-3 py-2 text-sm sm:inline-flex" onClick={onBackHome} type="button">
+            {t.home}
+          </button>
           <div className="seg flex" role="group" aria-label={t.language}>
             <button data-on={language === "zh"} onClick={() => setLanguage("zh")} type="button">
               中文
@@ -1096,6 +1128,10 @@ function NoteChips({ notes, empty }: { notes: MotifNote[]; empty: string }) {
 }
 
 /* ============================ pure helpers ============================ */
+
+function getRouteView(): RouteView {
+  return window.location.hash === "#studio" ? "studio" : "home";
+}
 
 function pitchToNorm(midi: number): number {
   return clamp((midi - 36) / 48, 0, 1);
