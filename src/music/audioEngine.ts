@@ -1,6 +1,6 @@
 import * as Tone from "tone";
 import { HarmonyEngine } from "./harmonyEngine";
-import { MusicEngine, RATE_LIMITED, type ResolveKeyOptions, type ResolveKeyResult, type ResolvedNoteEvent } from "./musicEngine";
+import { MusicEngine, RATE_LIMITED, type KeyRegion, type ResolveKeyOptions, type ResolveKeyResult, type ResolvedNoteEvent } from "./musicEngine";
 import type { RootNote } from "./scales";
 import type { StyleModeConfig } from "./styles";
 import { DEFAULT_TIMBRE_OPTIONS, type TimbreOptions } from "./timbre";
@@ -60,6 +60,19 @@ export class AudioEngine {
   private autoFilter: Tone.AutoFilter | null = null;
   private autoPanner: Tone.AutoPanner | null = null;
   private autoFilterLfo: Tone.Signal | null = null;
+
+  // ---- P2 parameters ----
+  /** Per-key timbre offset: ±Hz added to melodyFilter frequency per region. */
+  private keyRegionFilterOffset = 0;
+  /** Emotion-driven bias shaping articulation: -1 (staccato) … +1 (legato). */
+  private emotionArticulationBias = 0;
+  /** Emotion-driven brightness bias: -1 (darker) … +1 (brighter). */
+  private emotionBrightnessBias = 0;
+
+  setEmotionParams(articulationBias: number, brightnessBias: number): void {
+    this.emotionArticulationBias = clamp(articulationBias, -1, 1);
+    this.emotionBrightnessBias = clamp(brightnessBias, -1, 1);
+  }
 
   constructor(style: StyleModeConfig, root: RootNote, scaleId: string) {
     this.style = style;
@@ -162,6 +175,14 @@ export class AudioEngine {
 
     // Update spatial modulation rate from typing speed.
     this.applyExpressionRate(this.music.getRollingAvgIntervalMs());
+
+    // P2#7: per-key-region filter offset — left hand slightly darker, right hand brighter.
+    this.keyRegionFilterOffset = this.getKeyRegionFilterOffset(event.keyRegion);
+
+    // P2#8: emotion-driven brightness tweak rides on top of the timbre slider.
+    const emotionFreqOffset = this.emotionBrightnessBias * 220;
+    const baseCutoff = this.getMelodyCutoff() + this.keyRegionFilterOffset + emotionFreqOffset;
+    this.melodyFilter?.frequency.rampTo(clamp(baseCutoff, 400, 7200), 0.03);
 
     // If this note lands on the same quantize slot as the previous one, pull it
     // back so a couple of fast keystrokes read as a soft dyad, not a thump.
@@ -461,18 +482,30 @@ export class AudioEngine {
     this.autoPanner.frequency.rampTo(pannerRate, 0.2);
   }
 
+  /** Offset applied to the melody filter frequency per key hand-region. */
+  private getKeyRegionFilterOffset(keyRegion: KeyRegion): number {
+    switch (keyRegion) {
+      case "left":  return -90;  // warmer/darker
+      case "right": return +100; // brighter/clearer
+      default:      return 0;
+    }
+  }
+
   private getMelodyNoteDuration(elapsedMs: number): string | number {
-    // When notes follow closely, shorten them so their tails do not stack into mud.
-    // Mostly matters for the long-sustaining Sad Piano ("4n") preset; slow,
-    // deliberate playing keeps the full, lush note length.
-    if (elapsedMs < 240) {
+    // P2#8: emotion articulation bias shifts the note-length threshold.
+    // Legato bias (+1) = allow longer notes at higher speeds.
+    // Staccato bias (-1) = shorten notes even at moderate speeds.
+    const biasMs = this.emotionArticulationBias * 100;
+    const threshold = 240 + biasMs;
+    if (elapsedMs < threshold) {
       return Tone.Time(this.style.quantize).toSeconds() * 1.1;
     }
     return this.style.noteDuration;
   }
 
   private getMelodyCutoff(): number {
-    return clamp(720 + this.timbre.brightness * 5600 - this.timbre.warmth * 420, 650, 6200);
+    const emotionOffset = this.emotionBrightnessBias * 220;
+    return clamp(720 + this.timbre.brightness * 5600 - this.timbre.warmth * 420 + emotionOffset, 400, 7200);
   }
 
   private getFilterQ(): number {

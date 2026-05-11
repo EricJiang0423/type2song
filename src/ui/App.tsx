@@ -175,6 +175,32 @@ export default function App() {
     engineRef.current?.setDensity(density);
   }, [density]);
 
+  // P2#8: Sync emotion → articulation/brightness bias to the engine.
+  useEffect(() => {
+    let articulationBias = 0;
+    let brightnessBias = 0;
+    switch (emotion.emotion) {
+      case "calm":
+        articulationBias = 0.2;
+        brightnessBias = -0.25;
+        break;
+      case "sad":
+        articulationBias = 0.5;
+        brightnessBias = -0.15;
+        break;
+      case "energy":
+        articulationBias = -0.3;
+        brightnessBias = 0.35;
+        break;
+      case "cute":
+        articulationBias = -0.4;
+        brightnessBias = 0.45;
+        break;
+      // neutral: 0, 0
+    }
+    engineRef.current?.setEmotionParams(articulationBias, brightnessBias);
+  }, [emotion]);
+
   async function handleStartAudio() {
     const engine = await getOrCreateEngine();
     await engine.start();

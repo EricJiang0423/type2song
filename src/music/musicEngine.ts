@@ -15,10 +15,23 @@ import type { QuantizeValue } from "./styles";
 
 export type MotifVariant = "direct" | "chord-neighbor" | "motif-repeat" | "motif-neighbor";
 export type InputMode = "scale-degree" | "number-piano";
+export type KeyRegion = "left" | "right" | "center";
 /** Returned when a playable key is dropped by the rate limit (no note, but the UI can still react). */
 export const RATE_LIMITED = "rate-limited" as const;
 export type ResolveKeyResult = ResolvedNoteEvent | typeof RATE_LIMITED | null;
 const MELODY_BASE_OCTAVE = 3;
+
+/** Touch-typing left-hand keys. */
+const LEFT_HAND_KEYS = new Set("qwertasdfgzxcvb");
+/** Touch-typing right-hand keys. */
+const RIGHT_HAND_KEYS = new Set("yuiophjklnm");
+
+export function keyToRegion(key: string): KeyRegion {
+  const lower = key.toLowerCase();
+  if (LEFT_HAND_KEYS.has(lower)) return "left";
+  if (RIGHT_HAND_KEYS.has(lower)) return "right";
+  return "center";
+}
 
 export interface CalculationStep {
   id: string;
@@ -42,6 +55,8 @@ export interface ResolvedNoteEvent extends MotifNote {
   key: string;
   keyLabel: string;
   keyClass: KeyDegreeMapping["keyClass"];
+  /** Touch-typing hand region for per-key timbre differentiation. */
+  keyRegion: KeyRegion;
   quantize: QuantizeValue;
   scheduledTime: number;
   exportTimeSeconds: number;
@@ -242,6 +257,7 @@ export class MusicEngine {
       elapsedMs: elapsed,
       harmonyScore: harmonic.score,
       harmonyReason: harmonic.reason,
+      keyRegion: keyToRegion(key),
       inputMode: "scale-degree",
       calculation,
       motif: this.getMotif(),
@@ -316,6 +332,7 @@ export class MusicEngine {
       elapsedMs: elapsed,
       harmonyScore: 0,
       harmonyReason: "direct piano key bypassed scale and chord remapping",
+      keyRegion: keyToRegion(key),
       inputMode: "number-piano",
       calculation,
       motif: this.getMotif(),
